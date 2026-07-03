@@ -11,9 +11,11 @@ import app.email.generator as generator_module
 import app.email.service as email_service_module
 import app.followup.service as followup_service_module
 import app.models  # noqa: F401 - register all models on Base.metadata
+from app.core.security import create_access_token, hash_password
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app as fastapi_app
+from app.models.user import User
 
 
 @pytest.fixture()
@@ -34,13 +36,26 @@ def db_session():
         engine.dispose()
 
 
+TEST_USER_EMAIL = "test-admin@example.it"
+TEST_USER_PASSWORD = "test-password"
+
+
 @pytest.fixture()
 def client(db_session):
+    """A TestClient pre-authenticated as a seeded test admin user, so tests exercising
+    protected endpoints don't need to know about auth. Tests that specifically test the auth
+    flow itself can pop the Authorization header or seed their own user."""
+
     def override_get_db():
         yield db_session
 
     fastapi_app.dependency_overrides[get_db] = override_get_db
+
+    db_session.add(User(email=TEST_USER_EMAIL, hashed_password=hash_password(TEST_USER_PASSWORD)))
+    db_session.commit()
+
     with TestClient(fastapi_app) as test_client:
+        test_client.headers["Authorization"] = f"Bearer {create_access_token(TEST_USER_EMAIL)}"
         yield test_client
     fastapi_app.dependency_overrides.clear()
 
@@ -54,6 +69,10 @@ class FakeSettings:
         self.secret_key = "test-secret"
         self.unsubscribe_base_url = "http://localhost:8000/unsubscribe"
         self.ms_graph_sender_mailbox = "outreach@example.it"
+        self.jwt_algorithm = "HS256"
+        self.jwt_expire_minutes = 1440
+        self.dashboard_admin_email = "admin@example.it"
+        self.dashboard_admin_password = "test-password"
 
 
 @pytest.fixture()

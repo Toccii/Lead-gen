@@ -1,3 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .input {
+    @apply w-full border rounded px-3 py-2 text-sm mt-1 bg-transparent;
+  }
+}

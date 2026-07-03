@@ -5,7 +5,7 @@ generazione email personalizzate (Claude), invio/lettura via Microsoft Graph,
 follow-up automatico su giorni lavorativi italiani, dashboard web (Next.js).
 
 Il progetto viene costruito per fasi (vedi sezione "Stato del progetto"
-sotto). Questo è lo stato al termine della **Fase 1 — Setup progetto**.
+sotto). Questo è lo stato al termine della **Fase 5 — Dashboard**.
 
 ## Struttura del repo
 
@@ -13,29 +13,34 @@ sotto). Questo è lo stato al termine della **Fase 1 — Setup progetto**.
 Lead-gen/
 ├── backend/            FastAPI + SQLAlchemy + Alembic
 │   ├── app/
-│   │   ├── core/       config (env vars), security (auth, Fase 5)
-│   │   ├── db/         base declarativa, sessione DB
+│   │   ├── core/       config (env vars), security (JWT/password hashing, unsubscribe token)
+│   │   ├── db/         base declarativa, sessione DB, seed utente admin
 │   │   ├── models/     tabelle: campaigns, leads, email_messages, replies,
 │   │   │               execution_logs, users, suppressions, system_settings
-│   │   ├── schemas/    Pydantic schemas API (Fase 5)
-│   │   ├── api/        router FastAPI (Fase 5)
-│   │   ├── sourcing/   interfaccia pluggable + adapter Apollo/mock (Fase 2)
-│   │   ├── email/      generazione (Claude) + invio/lettura (MS Graph) (Fase 3/4)
-│   │   ├── followup/   logica giorni lavorativi italiani (Fase 4)
-│   │   └── jobs/       job settimanale e giornaliero (Fase 6)
+│   │   ├── schemas/    Pydantic schemas API
+│   │   ├── api/        router FastAPI (auth, campaigns, leads, emails, sourcing,
+│   │   │               jobs, execution-logs, metrics, unsubscribe) + auth dependency
+│   │   ├── sourcing/   interfaccia pluggable + adapter Apollo/mock
+│   │   ├── email/      generazione (Claude) + invio/lettura (MS Graph)
+│   │   ├── followup/   logica giorni lavorativi italiani + rilevamento risposte
+│   │   └── jobs/       job settimanale (Fase 6) e giornaliero (reply-check + follow-up)
 │   └── alembic/        migrazioni DB
-├── frontend/           Next.js (App Router, TS, Tailwind) — dashboard (Fase 5)
+├── frontend/           Next.js (App Router, TS, Tailwind) — dashboard
+│   ├── app/             login, dashboard home, lead, campagne (+ editor ICP), log
+│   ├── components/       DashboardShell (nav + auth guard)
+│   └── lib/              client API con JWT Bearer, auth context
 ├── docker-compose.yml  ambiente di sviluppo locale (Postgres + backend + frontend)
 └── .env.example        tutte le variabili d'ambiente necessarie
 ```
 
 ## Stato del progetto (fasi)
 
-- [x] **Fase 1 — Setup progetto**: struttura cartelle, schema DB, `.env.example`
-- [ ] Fase 2 — Scheda ICP + sourcing Apollo (con dati mock)
-- [ ] Fase 3 — Generazione ed invio email (dry-run first)
-- [ ] Fase 4 — Rilevamento risposte + follow-up giorni lavorativi
-- [ ] Fase 5 — Dashboard
+- [x] Fase 1 — Setup progetto: struttura cartelle, schema DB, `.env.example`
+- [x] Fase 2 — Scheda ICP + sourcing Apollo (con dati mock)
+- [x] Fase 3 — Generazione ed invio email (dry-run di default)
+- [x] Fase 4 — Rilevamento risposte + follow-up giorni lavorativi
+- [x] **Fase 5 — Dashboard**: login, tabella lead con filtri, metriche/funnel,
+      editor scheda ICP e template email, log esecuzioni
 - [ ] Fase 6 — Scheduler/automazione finale
 - [ ] Fase 7 — Deploy
 
@@ -57,6 +62,9 @@ Lead-gen/
    ```bash
    docker compose exec backend alembic upgrade head
    ```
+4. Accedi alla dashboard su http://localhost:3000/login con le credenziali
+   `DASHBOARD_ADMIN_EMAIL` / `DASHBOARD_ADMIN_PASSWORD` impostate in `.env`
+   (l'utente viene creato/aggiornato automaticamente all'avvio del backend).
 
 ### Sviluppo senza Docker
 

@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     daily_job_hour: int = 9
     timezone: str = "Europe/Rome"
 
+    # Dashboard frontend origin, used to restrict CORS outside of development.
+    frontend_origin: str = "http://localhost:3000"
+
 
 @lru_cache
 def get_settings() -> Settings:
