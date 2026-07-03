@@ -35,7 +35,9 @@ class Settings(BaseSettings):
 
     # Email sending behavior
     email_dry_run: bool = True
-    unsubscribe_base_url: str = "http://localhost:3000/unsubscribe"
+    # Served directly by the backend (GET /unsubscribe/{token}), not by the dashboard frontend,
+    # so opt-out keeps working even before/without the dashboard being deployed.
+    unsubscribe_base_url: str = "http://localhost:8000/unsubscribe"
 
     # Rate limiting & scheduling defaults (overridable via system_settings table)
     max_emails_per_day: int = 30
