@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routers import campaigns, emails, execution_logs, leads, sourcing, unsubscribe
+from app.api.routers import campaigns, emails, execution_logs, jobs, leads, sourcing, unsubscribe
 from app.core.config import get_settings
 
 settings = get_settings()
@@ -21,6 +21,7 @@ app.include_router(sourcing.router)
 app.include_router(leads.router)
 app.include_router(emails.router)
 app.include_router(execution_logs.router)
+app.include_router(jobs.router)
 app.include_router(unsubscribe.router)
 
 

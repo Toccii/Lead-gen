@@ -30,7 +30,7 @@ class SentMessage:
     graph_conversation_id: str | None
 
 
-def _get_access_token() -> str:
+def get_access_token() -> str:
     settings = get_settings()
     if not (settings.ms_graph_tenant_id and settings.ms_graph_client_id and settings.ms_graph_client_secret):
         raise GraphAuthError("Microsoft Graph credentials are not configured")
@@ -52,7 +52,7 @@ def send_email(to_address: str, subject: str, body_text: str) -> SentMessage:
     if not mailbox:
         raise GraphAuthError("MS_GRAPH_SENDER_MAILBOX is not configured")
 
-    token = _get_access_token()
+    token = get_access_token()
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
     draft_payload = {
