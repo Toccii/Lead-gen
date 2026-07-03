@@ -1,12 +1,17 @@
 FROM node:22-slim AS deps
 WORKDIR /app
-COPY package.json ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 FROM node:22-slim AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Next.js inlines NEXT_PUBLIC_* vars into the client bundle at build time, not at container
+# start - so it must be passed as a build ARG (--build-arg on `docker build`, or the
+# platform's "build variables" setting), not just a runtime env var.
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 RUN npm run build
 
 FROM node:22-slim AS runner

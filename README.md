@@ -5,8 +5,9 @@ generazione email personalizzate (Claude), invio/lettura via Microsoft Graph,
 follow-up automatico su giorni lavorativi italiani, dashboard web (Next.js).
 
 Il progetto viene costruito per fasi (vedi sezione "Stato del progetto"
-sotto). Questo è lo stato al termine della **Fase 6 — Scheduler/automazione
-finale**.
+sotto). Questo è lo stato al termine della **Fase 7 — Deploy**: tutto il
+codice e la configurazione sono pronti; il deploy effettivo su Railway
+richiede il tuo account (vedi sezione "Deploy su Railway" sotto).
 
 ## Struttura del repo
 
@@ -30,9 +31,13 @@ Lead-gen/
 │   ├── app/             login, dashboard home, lead, campagne (+ editor ICP), log
 │   ├── components/       DashboardShell (nav + auth guard)
 │   └── lib/              client API con JWT Bearer, auth context
+├── .github/workflows/  CI (test backend + build frontend ad ogni push/PR)
 ├── docker-compose.yml  ambiente di sviluppo locale (Postgres + backend + frontend)
 └── .env.example        tutte le variabili d'ambiente necessarie
 ```
+
+`backend/railway.json` e `frontend/railway.json` contengono la
+configurazione Docker di base per il deploy su Railway (Fase 7).
 
 ## Stato del progetto (fasi)
 
@@ -42,10 +47,12 @@ Lead-gen/
 - [x] Fase 4 — Rilevamento risposte + follow-up giorni lavorativi
 - [x] Fase 5 — Dashboard: login, tabella lead con filtri, metriche/funnel,
       editor scheda ICP e template email, log esecuzioni
-- [x] **Fase 6 — Scheduler/automazione finale**: job settimanale (sourcing +
+- [x] Fase 6 — Scheduler/automazione finale: job settimanale (sourcing +
       primo invio) e job giornaliero (risposte + follow-up), entrambi
       collegabili al cron della piattaforma, orario configurabile da dashboard
-- [ ] Fase 7 — Deploy
+- [x] **Fase 7 — Deploy**: `railway.json` per backend/frontend, CI GitHub
+      Actions (test + build ad ogni push), guida passo-passo per Railway
+      (e alternativa Render) — il deploy sul tuo account resta da fare
 
 ## Quickstart (sviluppo locale)
 
@@ -177,24 +184,81 @@ pulsanti "Genera lead ora" ed "Esegui job settimanale ora" nella dashboard,
 e gli endpoint `POST /jobs/*`, ignorano sempre questo controllo ed eseguono
 subito.
 
-### Railway
+## Deploy su Railway (Fase 7)
 
-Per ciascuno dei due job, crea un servizio separato nello stesso progetto
-Railway (stesso repo, root `backend/`):
-- **Start command**: `python -m app.jobs.weekly_job` (o `daily_job`)
-- **Cron Schedule**: `0 * * * *` (ogni ora) — impostabile nelle Settings del
-  servizio
-- Nessuna porta esposta: è un job one-shot, non un servizio web
-- Eredita automaticamente `DATABASE_URL` e le altre variabili condivise nel
-  progetto
+Railway è la piattaforma scelta (vedi confronto in Fase 1: cron nativo
+semplice, `DATABASE_URL` condiviso automaticamente tra i servizi dello
+stesso progetto, nessun cold-start sul piano a pagamento). Il deploy vero e
+proprio richiede il tuo account Railway: creazione progetto, collegamento
+del repo GitHub e inserimento delle chiavi reali sono passaggi che devi
+fare tu. `backend/railway.json` e `frontend/railway.json` sono già pronti
+nel repo con la configurazione Docker di base.
 
-### Render
+Il progetto Railway finale avrà **5 servizi**: Postgres + backend (web) +
+frontend (web) + 2 job (cron, senza dominio pubblico).
 
-Crea due risorse **Cron Job** (non Web Service) puntate a `backend/`:
-- **Build command**: `pip install -r requirements.txt`
-- **Command**: `python -m app.jobs.weekly_job` (o `daily_job`)
-- **Schedule**: `0 * * * *`
-- Collega lo stesso database Postgres del servizio web tramite `DATABASE_URL`
+1. **Crea il progetto**
+   - [railway.app](https://railway.app) → **New Project** → **Deploy from
+     GitHub repo** → seleziona questo repository.
+
+2. **Aggiungi Postgres**
+   - Nel progetto → **New** → **Database** → **PostgreSQL**. Railway
+     genera ed espone `DATABASE_URL` a tutti i servizi del progetto che la
+     referenziano.
+
+3. **Servizio backend (web)**
+   - **New** → **GitHub Repo** → stesso repo → **Root Directory**:
+     `backend`. Railway rileva `railway.json` e il `Dockerfile`.
+   - **Variables**: aggiungi tutte quelle di `.env.example` per il backend
+     (`SECRET_KEY`, `DASHBOARD_ADMIN_EMAIL`, `DASHBOARD_ADMIN_PASSWORD`,
+     `APOLLO_API_KEY`, `ANTHROPIC_API_KEY`, `MS_GRAPH_*`,
+     `EMAIL_DRY_RUN`, `MAX_EMAILS_PER_DAY`, `UNSUBSCRIBE_BASE_URL`,
+     `FRONTEND_ORIGIN`, `ENVIRONMENT=production`). Per `DATABASE_URL` usa
+     il riferimento alla variabile del servizio Postgres (`${{Postgres.DATABASE_URL}}`
+     nella UI di Railway, sostituendo lo schema `postgresql://` con
+     `postgresql+psycopg://`, oppure incollala e modifica lo schema a mano).
+   - **Settings → Networking** → genera un dominio pubblico (serve per
+     `UNSUBSCRIBE_BASE_URL` e per l'URL che userà il frontend).
+   - Il comando di avvio in `railway.json` esegue `alembic upgrade head`
+     automaticamente prima di avviare il server ad ogni deploy.
+
+4. **Servizio frontend (web)**
+   - **New** → stesso repo → **Root Directory**: `frontend`.
+   - **Variables** → **Build Variables** (non runtime, perché Next.js le
+     inietta nel bundle in fase di build): `NEXT_PUBLIC_API_BASE_URL` =
+     l'URL pubblico del servizio backend generato al punto 3.
+   - **Settings → Networking** → genera un dominio pubblico: è l'indirizzo
+     della dashboard.
+   - Torna al servizio backend e aggiorna `FRONTEND_ORIGIN` con questo
+     dominio (serve per il CORS in produzione).
+
+5. **Servizio cron: job settimanale**
+   - **New** → stesso repo → **Root Directory**: `backend` di nuovo (stesso
+     codice, servizio separato).
+   - **Settings → Deploy** → **Custom Start Command**:
+     `python -m app.jobs.weekly_job`.
+   - **Settings → Cron Schedule**: `0 * * * *` (ogni ora — vedi sopra
+     perché l'orario effettivo si configura da dashboard, non qui).
+   - Stesse **Variables** del backend (Railway permette di copiarle da un
+     altro servizio). Nessun dominio pubblico necessario.
+
+6. **Servizio cron: job giornaliero**
+   - Come il punto 5, ma **Custom Start Command**:
+     `python -m app.jobs.daily_job`.
+
+7. **Primo accesso**
+   - Apri il dominio del frontend → `/login` → credenziali
+     `DASHBOARD_ADMIN_EMAIL` / `DASHBOARD_ADMIN_PASSWORD`.
+   - Dalla pagina **Impostazioni** imposta giorno/ora reali per i job.
+
+### Alternativa: Render
+
+Se preferisci Render invece di Railway: backend e frontend come **Web
+Service** (Docker, stesso `Dockerfile`/root directory), i due job come
+risorse **Cron Job** (non Web Service) con **Command**:
+`python -m app.jobs.weekly_job` / `daily_job` e **Schedule**: `0 * * * *`,
+tutti collegati allo stesso Postgres tramite `DATABASE_URL`. Vale la stessa
+nota sul build-time per `NEXT_PUBLIC_API_BASE_URL` nel servizio frontend.
 
 ## Compliance (GDPR)
 
