@@ -1,8 +1,9 @@
 """Daily job: reply detection + followup/close-out based on business-day deadlines.
 
-Exposes the reusable job functions (used by the manual test API endpoints now, in Phase 4, and
-by the cron entrypoint below). The actual platform cron schedule (Railway/Render Cron Job
-running `python -m app.jobs.daily_job` once a day) is wired up in Phase 6.
+Invoked by the hosting platform's cron scheduler as `python -m app.jobs.daily_job` - see
+README for the recommended cron wiring on Railway/Render. Gated by `app.jobs.schedule` so the
+cron itself can fire hourly while the actual hour stays editable from the dashboard
+(`system_settings` table) without touching the platform's cron config.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
 from app.followup.service import check_replies, process_followups_and_closeouts
+from app.jobs.schedule import is_daily_job_due
 from app.models.execution_log import ExecutionLog, ExecutionStatus, JobType
 
 # Re-checks a window wider than one day, so a missed or delayed run doesn't lose replies.
@@ -39,7 +41,10 @@ def _finish_log(db: Session, log: ExecutionLog, status: ExecutionStatus, summary
     db.refresh(log)
 
 
-def run_reply_check_job(db: Session) -> ExecutionLog:
+def run_reply_check_job(db: Session, force: bool = False) -> ExecutionLog | None:
+    if not force and not is_daily_job_due(db):
+        return None
+
     log = _start_log(db, JobType.DAILY_REPLY_CHECK)
     try:
         since = datetime.now(timezone.utc) - REPLY_CHECK_LOOKBACK
@@ -51,7 +56,10 @@ def run_reply_check_job(db: Session) -> ExecutionLog:
     return log
 
 
-def run_followup_job(db: Session) -> ExecutionLog:
+def run_followup_job(db: Session, force: bool = False) -> ExecutionLog | None:
+    if not force and not is_daily_job_due(db):
+        return None
+
     log = _start_log(db, JobType.DAILY_FOLLOWUP)
     try:
         summary = process_followups_and_closeouts(db)

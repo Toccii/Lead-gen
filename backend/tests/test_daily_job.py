@@ -6,7 +6,7 @@ from app.models.execution_log import ExecutionStatus, JobType
 
 def test_run_reply_check_job_writes_execution_log(db_session):
     with patch("app.jobs.daily_job.check_replies", return_value={"messages_checked": 0, "replies_matched": 0, "leads_updated": 0}):
-        log = run_reply_check_job(db_session)
+        log = run_reply_check_job(db_session, force=True)
 
     assert log.job_type == JobType.DAILY_REPLY_CHECK
     assert log.status == ExecutionStatus.SUCCESS
@@ -16,7 +16,7 @@ def test_run_reply_check_job_writes_execution_log(db_session):
 
 def test_run_reply_check_job_records_failure_without_raising(db_session):
     with patch("app.jobs.daily_job.check_replies", side_effect=RuntimeError("Graph is down")):
-        log = run_reply_check_job(db_session)
+        log = run_reply_check_job(db_session, force=True)
 
     assert log.status == ExecutionStatus.FAILED
     assert "Graph is down" in log.summary["errors"][0]
@@ -27,9 +27,29 @@ def test_run_followup_job_writes_execution_log(db_session):
         "app.jobs.daily_job.process_followups_and_closeouts",
         return_value={"followups_sent": 0, "followups_failed": 0, "closed_without_response": 0, "rate_limit_hit": False},
     ):
-        log = run_followup_job(db_session)
+        log = run_followup_job(db_session, force=True)
 
     assert log.job_type == JobType.DAILY_FOLLOWUP
+    assert log.status == ExecutionStatus.SUCCESS
+
+
+def test_run_reply_check_job_returns_none_when_not_due_and_not_forced(db_session, monkeypatch):
+    monkeypatch.setattr("app.jobs.daily_job.is_daily_job_due", lambda db, now=None: False)
+    log = run_reply_check_job(db_session)
+    assert log is None
+
+
+def test_run_followup_job_returns_none_when_not_due_and_not_forced(db_session, monkeypatch):
+    monkeypatch.setattr("app.jobs.daily_job.is_daily_job_due", lambda db, now=None: False)
+    log = run_followup_job(db_session)
+    assert log is None
+
+
+def test_run_reply_check_job_runs_when_due(db_session, monkeypatch):
+    monkeypatch.setattr("app.jobs.daily_job.is_daily_job_due", lambda db, now=None: True)
+    with patch("app.jobs.daily_job.check_replies", return_value={"messages_checked": 0, "replies_matched": 0, "leads_updated": 0}):
+        log = run_reply_check_job(db_session)
+    assert log is not None
     assert log.status == ExecutionStatus.SUCCESS
 
 

@@ -19,17 +19,49 @@ export default function DashboardHomePage() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [logs, setLogs] = useState<ExecutionLog[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
+  const [runMessage, setRunMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    apiJson<DashboardMetrics>("/metrics").then(setMetrics).catch((e) => setError(String(e)));
+  function loadLogs() {
     apiJson<ExecutionLog[]>("/execution-logs")
       .then((l) => setLogs(l.slice(0, 5)))
       .catch(() => undefined);
+  }
+
+  useEffect(() => {
+    apiJson<DashboardMetrics>("/metrics").then(setMetrics).catch((e) => setError(String(e)));
+    loadLogs();
   }, []);
+
+  async function handleRunWeekly() {
+    setRunning(true);
+    setRunMessage(null);
+    try {
+      const log = await apiJson<ExecutionLog>("/jobs/weekly-run", { method: "POST" });
+      setRunMessage(
+        `Job settimanale completato: ${log.summary.leads_sourced ?? 0} lead trovati, ${log.summary.emails_sent ?? 0} email inviate.`
+      );
+      loadLogs();
+    } catch {
+      setRunMessage("Errore durante l'esecuzione del job settimanale.");
+    } finally {
+      setRunning(false);
+    }
+  }
 
   return (
     <DashboardShell>
-      <h1 className="text-lg font-semibold mb-4">Dashboard</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-lg font-semibold">Dashboard</h1>
+        <button
+          onClick={handleRunWeekly}
+          disabled={running}
+          className="bg-black text-white rounded px-3 py-1.5 text-sm disabled:opacity-50"
+        >
+          {running ? "Esecuzione in corso..." : "Esegui job settimanale ora"}
+        </button>
+      </div>
+      {runMessage && <p className="text-sm mb-4">{runMessage}</p>}
       {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
       {metrics && (
         <>

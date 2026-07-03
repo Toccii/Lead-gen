@@ -14,6 +14,7 @@ from app.api.routers import (
     leads,
     metrics,
     sourcing,
+    system_settings,
     unsubscribe,
 )
 from app.core.config import get_settings
@@ -55,6 +56,7 @@ app.include_router(emails.router, dependencies=_protected)
 app.include_router(execution_logs.router, dependencies=_protected)
 app.include_router(jobs.router, dependencies=_protected)
 app.include_router(metrics.router, dependencies=_protected)
+app.include_router(system_settings.router, dependencies=_protected)
 app.include_router(unsubscribe.router)  # public: recipients click this link unauthenticated
 
 

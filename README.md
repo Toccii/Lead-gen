@@ -5,7 +5,8 @@ generazione email personalizzate (Claude), invio/lettura via Microsoft Graph,
 follow-up automatico su giorni lavorativi italiani, dashboard web (Next.js).
 
 Il progetto viene costruito per fasi (vedi sezione "Stato del progetto"
-sotto). Questo è lo stato al termine della **Fase 5 — Dashboard**.
+sotto). Questo è lo stato al termine della **Fase 6 — Scheduler/automazione
+finale**.
 
 ## Struttura del repo
 
@@ -23,7 +24,7 @@ Lead-gen/
 │   │   ├── sourcing/   interfaccia pluggable + adapter Apollo/mock
 │   │   ├── email/      generazione (Claude) + invio/lettura (MS Graph)
 │   │   ├── followup/   logica giorni lavorativi italiani + rilevamento risposte
-│   │   └── jobs/       job settimanale (Fase 6) e giornaliero (reply-check + follow-up)
+│   │   └── jobs/       job settimanale e giornaliero + gate di schedulazione
 │   └── alembic/        migrazioni DB
 ├── frontend/           Next.js (App Router, TS, Tailwind) — dashboard
 │   ├── app/             login, dashboard home, lead, campagne (+ editor ICP), log
@@ -39,9 +40,11 @@ Lead-gen/
 - [x] Fase 2 — Scheda ICP + sourcing Apollo (con dati mock)
 - [x] Fase 3 — Generazione ed invio email (dry-run di default)
 - [x] Fase 4 — Rilevamento risposte + follow-up giorni lavorativi
-- [x] **Fase 5 — Dashboard**: login, tabella lead con filtri, metriche/funnel,
+- [x] Fase 5 — Dashboard: login, tabella lead con filtri, metriche/funnel,
       editor scheda ICP e template email, log esecuzioni
-- [ ] Fase 6 — Scheduler/automazione finale
+- [x] **Fase 6 — Scheduler/automazione finale**: job settimanale (sourcing +
+      primo invio) e job giornaliero (risposte + follow-up), entrambi
+      collegabili al cron della piattaforma, orario configurabile da dashboard
 - [ ] Fase 7 — Deploy
 
 ## Quickstart (sviluppo locale)
@@ -147,6 +150,51 @@ un login utente interattivo.
 
 Questi flussi di invio/lettura verranno implementati nella Fase 3 e 4; per
 ora bastano le credenziali salvate in `.env`.
+
+## Automazione (job settimanale + giornaliero)
+
+Ci sono due entrypoint pensati per essere lanciati dal cron della piattaforma
+di hosting:
+
+```bash
+python -m app.jobs.weekly_job   # sourcing + primo invio per le campagne attive
+python -m app.jobs.daily_job    # controllo risposte + follow-up/chiusura
+```
+
+Scrivono un `ExecutionLog` per ogni esecuzione, visibile in dashboard (Log e,
+per il job settimanale, anche nella pagina di dettaglio di ogni campagna).
+
+### Perché il cron gira ogni ora, non a un orario fisso
+
+Giorno/ora del job settimanale e ora del job giornaliero sono modificabili
+dalla dashboard (pagina **Impostazioni**, tabella `system_settings`). Per
+evitare di dover aggiornare la configurazione cron della piattaforma ogni
+volta che cambi quell'orario, il cron è pensato per invocare gli entrypoint
+**ogni ora**: la funzione stessa controlla se "adesso" (in Europe/Rome)
+corrisponde al giorno/ora configurato e, se non è il momento giusto, esce
+subito senza fare nulla (nessun `ExecutionLog` scritto per i "no-op"). I
+pulsanti "Genera lead ora" ed "Esegui job settimanale ora" nella dashboard,
+e gli endpoint `POST /jobs/*`, ignorano sempre questo controllo ed eseguono
+subito.
+
+### Railway
+
+Per ciascuno dei due job, crea un servizio separato nello stesso progetto
+Railway (stesso repo, root `backend/`):
+- **Start command**: `python -m app.jobs.weekly_job` (o `daily_job`)
+- **Cron Schedule**: `0 * * * *` (ogni ora) — impostabile nelle Settings del
+  servizio
+- Nessuna porta esposta: è un job one-shot, non un servizio web
+- Eredita automaticamente `DATABASE_URL` e le altre variabili condivise nel
+  progetto
+
+### Render
+
+Crea due risorse **Cron Job** (non Web Service) puntate a `backend/`:
+- **Build command**: `pip install -r requirements.txt`
+- **Command**: `python -m app.jobs.weekly_job` (o `daily_job`)
+- **Schedule**: `0 * * * *`
+- Collega lo stesso database Postgres del servizio web tramite `DATABASE_URL`
 
 ## Compliance (GDPR)
 

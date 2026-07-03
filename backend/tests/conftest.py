@@ -10,6 +10,7 @@ import app.core.security as security_module
 import app.email.generator as generator_module
 import app.email.service as email_service_module
 import app.followup.service as followup_service_module
+import app.jobs.weekly_job as weekly_job_module
 import app.models  # noqa: F401 - register all models on Base.metadata
 from app.core.security import create_access_token, hash_password
 from app.db.base import Base
@@ -88,6 +89,7 @@ def patch_email_settings(monkeypatch, fake_settings):
     monkeypatch.setattr(email_service_module, "get_settings", lambda: fake_settings)
     monkeypatch.setattr(followup_service_module, "get_settings", lambda: fake_settings)
     monkeypatch.setattr(security_module, "get_settings", lambda: fake_settings)
+    monkeypatch.setattr(weekly_job_module, "get_settings", lambda: fake_settings)
     return fake_settings
 
 

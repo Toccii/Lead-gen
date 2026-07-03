@@ -61,3 +61,13 @@ export interface DashboardMetrics {
   response_rate: number;
   funnel: Record<string, number>;
 }
+
+export interface SystemSettings {
+  max_emails_per_day: number;
+  weekly_job_day_of_week: number;
+  weekly_job_hour: number;
+  daily_job_hour: number;
+  timezone: string;
+  default_followup_delay_business_days: number;
+  default_close_after_days: number;
+}

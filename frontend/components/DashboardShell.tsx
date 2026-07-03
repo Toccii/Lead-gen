@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/leads", label: "Lead" },
   { href: "/campaigns", label: "Campagne" },
   { href: "/logs", label: "Log" },
+  { href: "/settings", label: "Impostazioni" },
 ];
 
 export default function DashboardShell({ children }: { children: ReactNode }) {
