@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,6 +11,18 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql+psycopg://leadgen:leadgen@localhost:5432/leadgen"
+
+    @field_validator("database_url")
+    @classmethod
+    def _normalize_database_url(cls, value: str) -> str:
+        """Railway/Render/Heroku-style platforms expose DATABASE_URL as `postgres://` or
+        `postgresql://`, without a driver suffix. SQLAlchemy needs `postgresql+psycopg://`
+        (we use the psycopg v3 driver) - normalize automatically so the platform's raw
+        connection string can be pasted in as-is."""
+        for prefix in ("postgres://", "postgresql://"):
+            if value.startswith(prefix):
+                return "postgresql+psycopg://" + value[len(prefix) :]
+        return value
 
     # Dashboard auth
     secret_key: str = "change-me-to-a-long-random-string"

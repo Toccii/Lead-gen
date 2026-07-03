@@ -213,10 +213,14 @@ frontend (web) + 2 job (cron, senza dominio pubblico).
      (`SECRET_KEY`, `DASHBOARD_ADMIN_EMAIL`, `DASHBOARD_ADMIN_PASSWORD`,
      `APOLLO_API_KEY`, `ANTHROPIC_API_KEY`, `MS_GRAPH_*`,
      `EMAIL_DRY_RUN`, `MAX_EMAILS_PER_DAY`, `UNSUBSCRIBE_BASE_URL`,
-     `FRONTEND_ORIGIN`, `ENVIRONMENT=production`). Per `DATABASE_URL` usa
-     il riferimento alla variabile del servizio Postgres (`${{Postgres.DATABASE_URL}}`
-     nella UI di Railway, sostituendo lo schema `postgresql://` con
-     `postgresql+psycopg://`, oppure incollala e modifica lo schema a mano).
+     `FRONTEND_ORIGIN`, `ENVIRONMENT=production`). **`DATABASE_URL` è
+     obbligatoria** (senza, il backend prova a connettersi a
+     `localhost:5432` e va in crash loop): imposta un riferimento alla
+     variabile del servizio Postgres, in Railway digitando
+     `${{Postgres.DATABASE_URL}}` nel valore della variabile (menu "Add
+     Reference" nell'editor delle Variables). Lo schema `postgres://` /
+     `postgresql://` che Railway espone viene normalizzato automaticamente
+     dal codice in `postgresql+psycopg://`, non serve modificarlo a mano.
    - **Settings → Networking** → genera un dominio pubblico (serve per
      `UNSUBSCRIBE_BASE_URL` e per l'URL che userà il frontend).
    - Il comando di avvio in `railway.json` esegue `alembic upgrade head`
@@ -250,6 +254,26 @@ frontend (web) + 2 job (cron, senza dominio pubblico).
    - Apri il dominio del frontend → `/login` → credenziali
      `DASHBOARD_ADMIN_EMAIL` / `DASHBOARD_ADMIN_PASSWORD`.
    - Dalla pagina **Impostazioni** imposta giorno/ora reali per i job.
+
+### Problemi comuni al primo deploy
+
+- **Il backend va in crash loop con `Connection refused` su
+  `127.0.0.1:5432`**: manca `DATABASE_URL` su quel servizio (backend o uno
+  dei due cron), quindi il codice usa il default per lo sviluppo locale.
+  Vai su quel servizio → **Variables** → aggiungi `DATABASE_URL` con il
+  riferimento al servizio Postgres (`${{Postgres.DATABASE_URL}}`). Ricorda:
+  **tutti e tre** i servizi basati su `backend/` (web + 2 cron) hanno
+  bisogno di questa variabile, non solo il web.
+- **Il frontend mostra errori di rete verso `localhost:8000`**: il build
+  del frontend non ha ricevuto `NEXT_PUBLIC_API_BASE_URL` come *build
+  variable* (Railway: sezione "Build Variables" nelle Variables del
+  servizio frontend, non quelle runtime). Dopo averla aggiunta serve un
+  nuovo deploy (redeploy), perché il valore viene inglobato nel bundle in
+  fase di build, non letto a runtime.
+- **`/login` risponde 401 anche con le credenziali giuste**: il backend
+  non è riuscito a fare il seed dell'utente admin all'avvio (di solito
+  perché il DB non era ancora raggiungibile in quel momento) — riavvia il
+  servizio backend dopo aver sistemato `DATABASE_URL`.
 
 ### Alternativa: Render
 
