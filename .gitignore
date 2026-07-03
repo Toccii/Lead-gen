@@ -1,0 +1,25 @@
+# Env files
+.env
+.env.local
+*.env
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
+# OS / editor
+.DS_Store
+*.swp
+
+# Local DB
+*.db
+*.sqlite3
