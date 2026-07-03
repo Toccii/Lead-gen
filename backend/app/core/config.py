@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -61,6 +61,24 @@ class Settings(BaseSettings):
 
     # Dashboard frontend origin, used to restrict CORS outside of development.
     frontend_origin: str = "http://localhost:3000"
+
+    @model_validator(mode="after")
+    def _check_database_url_outside_development(self) -> "Settings":
+        """Fails fast with one clear message instead of a long SQLAlchemy connection-retry
+        traceback when DATABASE_URL wasn't actually set on this service (falls back to the
+        localhost default) but ENVIRONMENT says we're not on a laptop."""
+        if self.environment != "development" and (
+            "localhost" in self.database_url or "127.0.0.1" in self.database_url
+        ):
+            raise ValueError(
+                "DATABASE_URL is missing or not reaching this service (it resolved to "
+                f"'{self.database_url}', the local-dev default). On Railway: open THIS "
+                "service's Variables tab (not another one - each service needs it "
+                "independently: backend web, weekly-job cron, and daily-job cron all need "
+                "DATABASE_URL set separately) and add a reference to the Postgres service, "
+                "e.g. ${{Postgres.DATABASE_URL}}. Then redeploy this service."
+            )
+        return self
 
 
 @lru_cache
